@@ -4,6 +4,7 @@ import os
 import re
 import socketserver
 import urllib.error
+import urllib.parse
 import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler
@@ -757,6 +758,8 @@ HTML = r"""<!doctype html>
     const clearChat = document.querySelector("#clearChat");
 
     let chat = [];
+    const userId = localStorage.getItem("sabbir_ai_user_id") || crypto.randomUUID();
+    localStorage.setItem("sabbir_ai_user_id", userId);
 
     function escapeHtml(value) {
       return String(value)
@@ -874,6 +877,11 @@ HTML = r"""<!doctype html>
       modelPill.textContent = memory.api_enabled ? memory.model : "Offline";
 
       const items = [];
+      if (memory.profile) {
+        Object.entries(memory.profile).forEach(([key, value]) => {
+          if (value) items.push(`${key}: ${value}`);
+        });
+      }
       memory.tasks.slice(-4).forEach((task) => items.push(`Task: ${task.text}`));
       memory.notes.slice(-4).forEach((note) => items.push(`Note: ${note.text}`));
       memory.facts.slice(-4).forEach((fact) => items.push(`Memory: ${fact}`));
@@ -896,15 +904,16 @@ HTML = r"""<!doctype html>
     }
 
     async function api(path, payload = null) {
+      const url = payload ? path : `${path}?user_id=${encodeURIComponent(userId)}`;
       const options = payload
         ? {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload),
+            body: JSON.stringify({...payload, user_id: userId}),
           }
         : {};
 
-      const response = await fetch(path, options);
+      const response = await fetch(url, options);
       if (!response.ok) {
         throw new Error(await response.text());
       }
@@ -978,7 +987,7 @@ HTML = r"""<!doctype html>
       addMessage("assistant", "Chat cleared. I still remember saved notes and tasks.");
     });
 
-    addMessage("assistant", "Hi Sabbir. I am ready to help with tasks, notes, plans, writing, and daily organization.");
+    addMessage("assistant", "Hi. I am ready to help like a personal assistant. Tell me how you want me to talk with you: friendly, professional, big-brother style, sisterly style, Bangla, English, or mixed. If you want, also tell me your pronouns or gender preference so I do not guess.");
     refreshMemory().catch(() => {
       apiState.textContent = "Assistant is starting...";
     });
@@ -1027,22 +1036,55 @@ def should_open_browser(host):
     return host in {"127.0.0.1", "localhost"}
 
 
-def load_memory():
+def blank_memory():
+    return {"facts": [], "tasks": [], "notes": [], "profile": {}}
+
+
+def clean_user_id(user_id):
+    value = str(user_id or "default")
+    value = re.sub(r"[^a-zA-Z0-9_-]", "", value)
+    return value[:80] or "default"
+
+
+def load_store():
     if not DATA_FILE.exists():
-        return {"facts": [], "tasks": [], "notes": []}
+        return {"users": {}}
     try:
         data = json.loads(DATA_FILE.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
-        return {"facts": [], "tasks": [], "notes": []}
+        return {"users": {}}
 
-    data.setdefault("facts", [])
-    data.setdefault("tasks", [])
-    data.setdefault("notes", [])
+    if "users" not in data:
+        old_memory = blank_memory()
+        old_memory["facts"] = data.get("facts", [])
+        old_memory["tasks"] = data.get("tasks", [])
+        old_memory["notes"] = data.get("notes", [])
+        return {"users": {"default": old_memory}}
+
+    data.setdefault("users", {})
     return data
 
 
-def save_memory(memory):
-    DATA_FILE.write_text(json.dumps(memory, indent=2), encoding="utf-8")
+def save_store(store):
+    DATA_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+
+
+def load_memory(user_id="default"):
+    store = load_store()
+    uid = clean_user_id(user_id)
+    memory = store["users"].get(uid, blank_memory())
+    memory.setdefault("facts", [])
+    memory.setdefault("tasks", [])
+    memory.setdefault("notes", [])
+    memory.setdefault("profile", {})
+    return memory
+
+
+def save_memory(user_id, memory):
+    store = load_store()
+    uid = clean_user_id(user_id)
+    store["users"][uid] = memory
+    save_store(store)
 
 
 def public_memory(memory):
@@ -1052,8 +1094,8 @@ def public_memory(memory):
     return data
 
 
-def add_memory(kind, text):
-    memory = load_memory()
+def add_memory(kind, text, user_id="default"):
+    memory = load_memory(user_id)
     text = text.strip()
     if not text:
         return memory
@@ -1069,7 +1111,7 @@ def add_memory(kind, text):
     memory["tasks"] = memory["tasks"][-50:]
     memory["notes"] = memory["notes"][-50:]
     memory["facts"] = memory["facts"][-50:]
-    save_memory(memory)
+    save_memory(user_id, memory)
     return memory
 
 
@@ -1077,8 +1119,12 @@ def memory_summary(memory):
     tasks = [f"- {task['text']}" for task in memory["tasks"][-10:]]
     notes = [f"- {note['text']}" for note in memory["notes"][-10:]]
     facts = [f"- {fact}" for fact in memory["facts"][-10:]]
+    profile = memory.get("profile", {})
+    profile_lines = [f"- {key}: {value}" for key, value in profile.items() if value]
     return "\n".join(
         [
+            "User profile and communication preferences:",
+            "\n".join(profile_lines) or "- unknown; ask briefly if useful, never guess gender",
             "Saved facts:",
             "\n".join(facts) or "- none",
             "Saved tasks:",
@@ -1087,6 +1133,67 @@ def memory_summary(memory):
             "\n".join(notes) or "- none",
         ]
     )
+
+
+def update_profile_from_message(message, memory):
+    lowered = message.lower()
+    profile = memory.setdefault("profile", {})
+    changed = False
+
+    patterns = [
+        ("gender", r"\b(i am|i'm|ami)\s+(a\s+)?(male|man|boy|chele|female|woman|girl|meye)\b"),
+        ("pronouns", r"\b(my pronouns are|pronouns:?)\s+([a-z/ ]{2,30})"),
+        ("tone", r"\b(talk|speak|reply|answer)\s+(to me\s+)?(like|in|with)\s+(.{3,80})"),
+        ("language", r"\b(bangla|bengali|english|mixed|banglish)\b"),
+    ]
+
+    for key, pattern in patterns:
+        match = re.search(pattern, lowered, re.IGNORECASE)
+        if not match:
+            continue
+        value = match.group(match.lastindex).strip()
+        if key == "gender":
+            gender_word = value
+            if gender_word in {"chele", "male", "man", "boy"}:
+                value = "male"
+            elif gender_word in {"meye", "female", "woman", "girl"}:
+                value = "female"
+        if profile.get(key) != value:
+            profile[key] = value
+            changed = True
+
+    if any(word in lowered for word in ["bhai", "bro", "brother"]):
+        profile["tone"] = "friendly brother style"
+        changed = True
+    if any(word in lowered for word in ["apu", "sis", "sister"]):
+        profile["tone"] = "friendly sister style"
+        changed = True
+    if "bangla" in lowered or "bengali" in lowered or "বাংলা" in message:
+        profile["language"] = "Bangla"
+        changed = True
+    if "english" in lowered:
+        profile["language"] = "English"
+        changed = True
+    if "banglish" in lowered or "mixed" in lowered:
+        profile["language"] = "Bangla-English mixed"
+        changed = True
+
+    return changed
+
+
+def profile_ack(memory):
+    profile = memory.get("profile", {})
+    pieces = []
+    if profile.get("gender"):
+        pieces.append(f"gender preference: {profile['gender']}")
+    if profile.get("pronouns"):
+        pieces.append(f"pronouns: {profile['pronouns']}")
+    if profile.get("tone"):
+        pieces.append(f"style: {profile['tone']}")
+    if profile.get("language"):
+        pieces.append(f"language: {profile['language']}")
+    detail = ", ".join(pieces) if pieces else "your preference"
+    return f"Got it. I saved {detail}. I will use that while talking with you."
 
 
 def extract_output_text(payload):
@@ -1160,9 +1267,16 @@ def ask_openai(message, chat, memory):
         f"{item.get('role', 'user')}: {item.get('content', '')}" for item in chat[-10:]
     )
     instructions = (
-        "You are Sabbir's personal AI assistant. Be practical, concise, warm, "
-        "and action-oriented. Use saved memory when it is relevant. If Sabbir asks "
-        "for plans, produce clear steps. If he asks to remember something, confirm it."
+        "You are a realistic, emotionally intelligent personal AI assistant. "
+        "Your replies should feel human, grounded, and useful, not robotic. "
+        "First understand the user's mood and intent, then answer with empathy and practical help. "
+        "Use saved memory and the user's profile when relevant. Match the user's language and tone "
+        "naturally: Bangla, English, or mixed if they use it. Do not guess gender from name, voice, "
+        "or writing style. If gender, pronouns, or preferred style is unknown and relevant, ask once "
+        "in a short, friendly way. If the user explicitly shares male/female/pronouns/style, respect it "
+        "without stereotypes. Be honest about uncertainty, give realistic steps, and avoid fake promises. "
+        "For emotional messages, validate the feeling first, then offer calm next steps. For plans, be clear "
+        "and concrete. Keep normal answers concise, but go deeper when the user asks."
     )
     prompt = (
         f"{memory_summary(memory)}\n\n"
@@ -1212,25 +1326,29 @@ def ask_openai(message, chat, memory):
     )
 
 
-def offline_reply(message, memory):
+def offline_reply(message, memory, user_id="default"):
     lowered = message.lower().strip()
+
+    if update_profile_from_message(message, memory):
+        save_memory(user_id, memory)
+        return profile_ack(memory)
 
     remember_match = re.search(r"remember(?: that)? (.+)", message, re.IGNORECASE)
     if remember_match:
         fact = remember_match.group(1).strip()
-        add_memory("fact", fact)
+        add_memory("fact", fact, user_id)
         return f"Saved to memory: {fact}"
 
     task_match = re.search(r"(?:add|save) task(?:\:| to)? (.+)", message, re.IGNORECASE)
     if task_match:
         task = task_match.group(1).strip()
-        add_memory("task", task)
+        add_memory("task", task, user_id)
         return f"Task saved: {task}"
 
     note_match = re.search(r"(?:add|save) note(?:\:| to)? (.+)", message, re.IGNORECASE)
     if note_match:
         note = note_match.group(1).strip()
-        add_memory("note", note)
+        add_memory("note", note, user_id)
         return f"Note saved: {note}"
 
     if "task" in lowered:
@@ -1257,7 +1375,11 @@ def offline_reply(message, memory):
         return "\n".join(steps)
 
     if "hello" in lowered or "hi" in lowered:
-        return "Hi Sabbir. I can help you plan, remember notes, manage tasks, draft text, and think through decisions."
+        return (
+            "Hi. I can help with planning, tasks, notes, writing, decisions, and emotional support. "
+            "Tell me your preferred style if you want: friendly, professional, brother-style, sister-style, "
+            "Bangla, English, or mixed."
+        )
 
     return (
         "I am running in offline assistant mode right now. I can save notes, save tasks, "
@@ -1273,13 +1395,15 @@ class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 class AssistantHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/api/memory":
-            self.send_json(public_memory(load_memory()))
+        path = self.path.split("?", 1)[0]
+        if path == "/api/memory":
+            user_id = self.query_value("user_id")
+            self.send_json(public_memory(load_memory(user_id)))
             return
-        if self.path == "/healthz":
+        if path == "/healthz":
             self.send_text("ok")
             return
-        if self.path == "/favicon.ico":
+        if path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
             return
@@ -1288,18 +1412,25 @@ class AssistantHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path == "/api/chat":
             payload = self.read_json()
+            user_id = clean_user_id(payload.get("user_id"))
             message = str(payload.get("message", "")).strip()
             chat = payload.get("chat", [])
-            memory = load_memory()
-            reply = ask_openai(message, chat, memory) or offline_reply(message, memory)
-            self.send_json({"reply": reply, "memory": public_memory(load_memory())})
+            memory = load_memory(user_id)
+            profile_changed = update_profile_from_message(message, memory)
+            if profile_changed:
+                save_memory(user_id, memory)
+            reply = ask_openai(message, chat, memory)
+            if not reply:
+                reply = profile_ack(memory) if profile_changed else offline_reply(message, memory, user_id)
+            self.send_json({"reply": reply, "memory": public_memory(load_memory(user_id))})
             return
 
         if self.path == "/api/memory":
             payload = self.read_json()
+            user_id = clean_user_id(payload.get("user_id"))
             kind = str(payload.get("type", "note"))
             text = str(payload.get("text", ""))
-            memory = add_memory(kind, text)
+            memory = add_memory(kind, text, user_id)
             self.send_json(public_memory(memory))
             return
 
@@ -1311,6 +1442,16 @@ class AssistantHandler(BaseHTTPRequestHandler):
             return {}
         raw = self.rfile.read(length).decode("utf-8")
         return json.loads(raw)
+
+    def query_value(self, name):
+        if "?" not in self.path:
+            return ""
+        query = self.path.split("?", 1)[1]
+        for pair in query.split("&"):
+            key, _, value = pair.partition("=")
+            if key == name:
+                return urllib.parse.unquote_plus(value)
+        return ""
 
     def send_html(self, html):
         encoded = html.encode("utf-8")
