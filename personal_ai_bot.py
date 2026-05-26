@@ -46,6 +46,7 @@ HTML = r"""<!doctype html>
 
     body {
       min-height: 100vh;
+      min-height: 100dvh;
       margin: 0;
       color: var(--text);
       font-family: Inter, ui-sans-serif, system-ui, "Segoe UI", Arial, sans-serif;
@@ -63,6 +64,7 @@ HTML = r"""<!doctype html>
 
     .shell {
       height: 100vh;
+      height: 100dvh;
       display: grid;
       grid-template-columns: 304px minmax(0, 1fr);
       gap: 14px;
@@ -462,50 +464,212 @@ HTML = r"""<!doctype html>
 
     @media (max-width: 850px) {
       body {
-        overflow: auto;
+        overflow: hidden;
       }
 
       .shell {
-        height: auto;
-        min-height: 100vh;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
         grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr);
+        gap: 10px;
+        padding: 10px;
       }
 
       .sidebar {
-        max-height: none;
+        max-height: 248px;
+        padding: 12px;
+        border-radius: 18px;
       }
 
       .chat {
-        min-height: 640px;
+        min-height: 0;
+        border-radius: 18px;
       }
 
       .header-actions {
         align-items: flex-end;
         flex-direction: column;
       }
+
+      .brand {
+        gap: 10px;
+      }
+
+      .logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 13px;
+      }
+
+      .brand h1 {
+        font-size: 19px;
+      }
+
+      .api-state {
+        padding: 8px 10px;
+        font-size: 12px;
+      }
+
+      .section {
+        padding-top: 10px;
+      }
+
+      .quick {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 3px;
+        scrollbar-width: none;
+      }
+
+      .quick::-webkit-scrollbar {
+        display: none;
+      }
+
+      .quick button {
+        flex: 0 0 auto;
+        min-height: 36px;
+      }
+
+      .mini-form input {
+        min-height: 38px;
+      }
+
+      .mini-form textarea {
+        min-height: 58px;
+      }
+
+      .memory-list {
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      }
+
+      .memory-item {
+        min-height: 38px;
+      }
+
+      .chat-header {
+        padding: 14px;
+      }
+
+      .messages {
+        padding: 16px 14px 18px;
+      }
+
+      .message {
+        max-width: 92%;
+        margin-bottom: 14px;
+      }
+
+      .composer {
+        padding: 12px;
+      }
     }
 
     @media (max-width: 520px) {
       .shell {
-        padding: 10px;
+        gap: 8px;
+        padding: 8px;
       }
 
-      .composer {
-        grid-template-columns: 1fr;
+      .sidebar {
+        max-height: 210px;
+        gap: 10px;
       }
 
-      .message {
-        max-width: 96%;
+      .sidebar .section:nth-of-type(2),
+      .sidebar .section:nth-of-type(3),
+      .sidebar .section:nth-of-type(4) {
+        display: none;
       }
 
       .chat-header {
         align-items: flex-start;
         flex-direction: column;
+        gap: 10px;
+      }
+
+      .chat-header h2 {
+        font-size: 18px;
+      }
+
+      .chat-header p {
+        font-size: 12px;
       }
 
       .header-actions {
         width: 100%;
-        align-items: stretch;
+        align-items: center;
+        flex-direction: row;
+        justify-content: space-between;
+      }
+
+      .model-pill {
+        max-width: calc(100vw - 124px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .clear {
+        min-width: 76px;
+      }
+
+      .messages {
+        padding: 14px 10px 16px;
+      }
+
+      .message {
+        max-width: 98%;
+        padding: 12px 13px;
+        border-radius: 17px;
+        font-size: 14px;
+        line-height: 1.58;
+      }
+
+      .assistant h1 { font-size: 21px; }
+      .assistant h2 { font-size: 18px; }
+      .assistant h3 { font-size: 16px; }
+
+      .assistant ul, .assistant ol {
+        margin-left: 18px;
+      }
+
+      .composer {
+        grid-template-columns: minmax(0, 1fr) 68px;
+        gap: 8px;
+        padding: 10px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+      }
+
+      .composer textarea {
+        min-height: 48px;
+        max-height: 112px;
+        padding: 12px;
+        border-radius: 16px;
+        font-size: 14px;
+      }
+
+      .composer button {
+        min-height: 48px;
+        border-radius: 16px;
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .sidebar {
+        max-height: 188px;
+      }
+
+      .brand p,
+      .api-state {
+        display: none;
+      }
+
+      .quick button {
+        min-height: 34px;
+        padding: 0 11px;
+        font-size: 12px;
       }
     }
   </style>
