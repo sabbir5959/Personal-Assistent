@@ -1109,13 +1109,17 @@ class ThreadingTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 class AssistantHandler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path == "/" or self.path.startswith("/?"):
-            self.send_html(HTML)
-            return
         if self.path == "/api/memory":
             self.send_json(public_memory(load_memory()))
             return
-        self.send_error(404)
+        if self.path == "/healthz":
+            self.send_text("ok")
+            return
+        if self.path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
+        self.send_html(HTML)
 
     def do_POST(self):
         if self.path == "/api/chat":
@@ -1156,6 +1160,14 @@ class AssistantHandler(BaseHTTPRequestHandler):
         encoded = json.dumps(payload).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def send_text(self, text):
+        encoded = text.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.send_header("Content-Length", str(len(encoded)))
         self.end_headers()
         self.wfile.write(encoded)
