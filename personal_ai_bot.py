@@ -25,7 +25,7 @@ HTML = r"""<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sabbir Personal AI</title>
+  <title>Personal AI Chat</title>
   <style>
     :root {
       --bg: #0f1117;
@@ -67,9 +67,86 @@ HTML = r"""<!doctype html>
       height: 100vh;
       height: 100dvh;
       display: grid;
-      grid-template-columns: 304px minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       padding: 14px;
+    }
+
+    .setup-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      background:
+        radial-gradient(circle at 22% 14%, rgba(124, 167, 255, 0.2), transparent 28%),
+        radial-gradient(circle at 76% 24%, rgba(255, 122, 182, 0.15), transparent 26%),
+        rgba(10, 13, 20, 0.86);
+      backdrop-filter: blur(18px);
+    }
+
+    .setup-screen.hidden {
+      display: none;
+    }
+
+    .setup-card {
+      width: min(94vw, 520px);
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      background: rgba(19, 23, 34, 0.94);
+      box-shadow: 0 30px 100px rgba(0, 0, 0, 0.44);
+    }
+
+    .setup-card h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      letter-spacing: 0;
+    }
+
+    .setup-card p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .setup-form {
+      display: grid;
+      gap: 13px;
+    }
+
+    .setup-field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .setup-field label {
+      color: #d8e2f3;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .setup-field input,
+    .setup-field select {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      color: var(--text);
+      background: rgba(7, 10, 18, 0.72);
+      outline: none;
+    }
+
+    .setup-form button {
+      min-height: 50px;
+      border: 0;
+      border-radius: 16px;
+      color: #07111f;
+      background: linear-gradient(135deg, #13d38e, #6ee7b7);
+      font-weight: 900;
+      cursor: pointer;
     }
 
     .sidebar, .chat {
@@ -81,7 +158,7 @@ HTML = r"""<!doctype html>
     }
 
     .sidebar {
-      display: flex;
+      display: none;
       flex-direction: column;
       gap: 16px;
       padding: 18px 16px;
@@ -246,6 +323,8 @@ HTML = r"""<!doctype html>
     .chat {
       display: grid;
       grid-template-rows: auto minmax(0, 1fr) auto;
+      width: min(100%, 1180px);
+      margin: 0 auto;
       border-radius: 22px;
       overflow: hidden;
     }
@@ -676,12 +755,51 @@ HTML = r"""<!doctype html>
   </style>
 </head>
 <body>
+  <section class="setup-screen" id="setupScreen">
+    <form class="setup-card setup-form" id="profileForm">
+      <div>
+        <h1>Set up your AI</h1>
+        <p>Tell the AI who you are first. It will use this to talk naturally with your name, gender/pronouns, and preferred style.</p>
+      </div>
+
+      <div class="setup-field">
+        <label for="profileName">Your name</label>
+        <input id="profileName" autocomplete="name" placeholder="Example: Sabbir, Riya, Tanvir" required>
+      </div>
+
+      <div class="setup-field">
+        <label for="profileGender">Gender or pronouns</label>
+        <select id="profileGender" required>
+          <option value="">Choose one</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+          <option value="they/them">They/them</option>
+          <option value="prefer not to say">Prefer not to say</option>
+        </select>
+      </div>
+
+      <div class="setup-field">
+        <label for="profileStyle">Talking style</label>
+        <select id="profileStyle" required>
+          <option value="friendly and natural">Friendly and natural</option>
+          <option value="professional and concise">Professional and concise</option>
+          <option value="big-brother style">Big-brother style</option>
+          <option value="sisterly caring style">Sisterly caring style</option>
+          <option value="Bangla-English mixed">Bangla-English mixed</option>
+          <option value="emotional and supportive">Emotional and supportive</option>
+        </select>
+      </div>
+
+      <button type="submit">Start Chat</button>
+    </form>
+  </section>
+
   <main class="shell">
     <aside class="sidebar">
       <div class="brand">
         <div class="logo">S</div>
         <div class="brand-copy">
-          <h1>Sabbir AI</h1>
+          <h1>Personal AI</h1>
           <p>Personal Gemini assistant</p>
         </div>
         <span class="pulse"></span>
@@ -723,8 +841,8 @@ HTML = r"""<!doctype html>
     <section class="chat">
       <header class="chat-header">
         <div>
-          <h2>Personal Assistant</h2>
-          <p>Ask for plans, reminders, drafts, summaries, ideas, or task help.</p>
+          <h2 id="chatTitle">Personal AI</h2>
+          <p id="chatSubtitle">Chat naturally after setup.</p>
         </div>
         <div class="header-actions">
           <span class="model-pill" id="modelPill">Checking model</span>
@@ -737,7 +855,7 @@ HTML = r"""<!doctype html>
       </div>
 
       <form class="composer" id="chatForm">
-        <textarea id="messageInput" placeholder="Ask Sabbir AI anything..."></textarea>
+        <textarea id="messageInput" placeholder="Message your AI..." disabled></textarea>
         <button type="submit">Send</button>
       </form>
     </section>
@@ -751,6 +869,13 @@ HTML = r"""<!doctype html>
     const memoryList = document.querySelector("#memoryList");
     const apiState = document.querySelector("#apiState");
     const modelPill = document.querySelector("#modelPill");
+    const setupScreen = document.querySelector("#setupScreen");
+    const profileForm = document.querySelector("#profileForm");
+    const profileName = document.querySelector("#profileName");
+    const profileGender = document.querySelector("#profileGender");
+    const profileStyle = document.querySelector("#profileStyle");
+    const chatTitle = document.querySelector("#chatTitle");
+    const chatSubtitle = document.querySelector("#chatSubtitle");
     const taskForm = document.querySelector("#taskForm");
     const noteForm = document.querySelector("#noteForm");
     const taskInput = document.querySelector("#taskInput");
@@ -760,6 +885,7 @@ HTML = r"""<!doctype html>
     let chat = [];
     const userId = localStorage.getItem("sabbir_ai_user_id") || crypto.randomUUID();
     localStorage.setItem("sabbir_ai_user_id", userId);
+    let profile = JSON.parse(localStorage.getItem("personal_ai_profile") || "null");
 
     function escapeHtml(value) {
       return String(value)
@@ -925,6 +1051,26 @@ HTML = r"""<!doctype html>
       renderMemory(data);
     }
 
+    function applyProfile() {
+      if (!profile || !profile.name || !profile.gender) {
+        setupScreen.classList.remove("hidden");
+        input.disabled = true;
+        return;
+      }
+
+      setupScreen.classList.add("hidden");
+      input.disabled = false;
+      chatTitle.textContent = `${profile.name}'s AI`;
+      chatSubtitle.textContent = `${profile.gender} · ${profile.style}`;
+      input.placeholder = `Message as ${profile.name}...`;
+      messagesInner.innerHTML = "";
+      addMessage(
+        "assistant",
+        `Hi ${profile.name}. I know your profile now: **${profile.gender}**, style: **${profile.style}**. Tell me what's on your mind.`
+      );
+      input.focus();
+    }
+
     async function sendMessage(text) {
       const clean = text.trim();
       if (!clean) return;
@@ -934,7 +1080,7 @@ HTML = r"""<!doctype html>
       const typing = addMessage("assistant", "Thinking...", "typing");
 
       try {
-        const data = await api("/api/chat", {message: clean, chat});
+        const data = await api("/api/chat", {message: clean, chat, profile});
         typing.remove();
         addMessage("assistant", data.reply);
         chat.push({role: "user", content: clean});
@@ -963,6 +1109,19 @@ HTML = r"""<!doctype html>
       button.addEventListener("click", () => sendMessage(button.dataset.prompt));
     });
 
+    profileForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      profile = {
+        name: profileName.value.trim(),
+        gender: profileGender.value,
+        style: profileStyle.value,
+      };
+      localStorage.setItem("personal_ai_profile", JSON.stringify(profile));
+      await api("/api/profile", {profile});
+      applyProfile();
+      refreshMemory();
+    });
+
     taskForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const text = taskInput.value.trim();
@@ -984,10 +1143,17 @@ HTML = r"""<!doctype html>
     clearChat.addEventListener("click", () => {
       chat = [];
       messagesInner.innerHTML = "";
-      addMessage("assistant", "Chat cleared. I still remember saved notes and tasks.");
+      if (profile) {
+        addMessage("assistant", `Chat cleared, ${profile.name}. I'm still here.`);
+      }
     });
 
-    addMessage("assistant", "Hi. I am ready to help like a personal assistant. Tell me how you want me to talk with you: friendly, professional, big-brother style, sisterly style, Bangla, English, or mixed. If you want, also tell me your pronouns or gender preference so I do not guess.");
+    if (profile) {
+      profileName.value = profile.name || "";
+      profileGender.value = profile.gender || "";
+      profileStyle.value = profile.style || "friendly and natural";
+    }
+    applyProfile();
     refreshMemory().catch(() => {
       apiState.textContent = "Assistant is starting...";
     });
@@ -1094,6 +1260,28 @@ def public_memory(memory):
     return data
 
 
+def apply_profile(memory, profile):
+    if not isinstance(profile, dict):
+        return False
+
+    clean_profile = memory.setdefault("profile", {})
+    changed = False
+    fields = {
+        "name": 80,
+        "gender": 40,
+        "style": 80,
+        "pronouns": 40,
+        "language": 40,
+        "tone": 80,
+    }
+    for key, limit in fields.items():
+        value = str(profile.get(key, "")).strip()
+        if value and clean_profile.get(key) != value[:limit]:
+            clean_profile[key] = value[:limit]
+            changed = True
+    return changed
+
+
 def add_memory(kind, text, user_id="default"):
     memory = load_memory(user_id)
     text = text.strip()
@@ -1116,21 +1304,15 @@ def add_memory(kind, text, user_id="default"):
 
 
 def memory_summary(memory):
-    tasks = [f"- {task['text']}" for task in memory["tasks"][-10:]]
-    notes = [f"- {note['text']}" for note in memory["notes"][-10:]]
     facts = [f"- {fact}" for fact in memory["facts"][-10:]]
     profile = memory.get("profile", {})
     profile_lines = [f"- {key}: {value}" for key, value in profile.items() if value]
     return "\n".join(
         [
             "User profile and communication preferences:",
-            "\n".join(profile_lines) or "- unknown; ask briefly if useful, never guess gender",
+            "\n".join(profile_lines) or "- unknown; ask for name, gender/pronouns, and style before chatting",
             "Saved facts:",
             "\n".join(facts) or "- none",
-            "Saved tasks:",
-            "\n".join(tasks) or "- none",
-            "Saved notes:",
-            "\n".join(notes) or "- none",
         ]
     )
 
@@ -1184,8 +1366,10 @@ def update_profile_from_message(message, memory):
 def profile_ack(memory):
     profile = memory.get("profile", {})
     pieces = []
+    if profile.get("name"):
+        pieces.append(f"name: {profile['name']}")
     if profile.get("gender"):
-        pieces.append(f"gender preference: {profile['gender']}")
+        pieces.append(f"gender/pronouns: {profile['gender']}")
     if profile.get("pronouns"):
         pieces.append(f"pronouns: {profile['pronouns']}")
     if profile.get("tone"):
@@ -1270,18 +1454,20 @@ def ask_openai(message, chat, memory):
         "You are a realistic, emotionally intelligent personal AI assistant. "
         "Your replies should feel human, grounded, and useful, not robotic. "
         "First understand the user's mood and intent, then answer with empathy and practical help. "
-        "Use saved memory and the user's profile when relevant. Match the user's language and tone "
-        "naturally: Bangla, English, or mixed if they use it. Do not guess gender from name, voice, "
-        "or writing style. If gender, pronouns, or preferred style is unknown and relevant, ask once "
-        "in a short, friendly way. If the user explicitly shares male/female/pronouns/style, respect it "
+        "Always use the user's saved name naturally, but do not overuse it. Use the user's saved "
+        "gender/pronouns and preferred style respectfully. Do not assume the user is Sabbir. "
+        "Do not guess gender from name or writing style. Match the user's language and tone naturally: "
+        "Bangla, English, or mixed if they use it. Respect male, female, they/them, or prefer-not-to-say "
         "without stereotypes. Be honest about uncertainty, give realistic steps, and avoid fake promises. "
         "For emotional messages, validate the feeling first, then offer calm next steps. For plans, be clear "
         "and concrete. Keep normal answers concise, but go deeper when the user asks."
     )
+    profile = memory.get("profile", {})
+    user_name = profile.get("name") or "the user"
     prompt = (
         f"{memory_summary(memory)}\n\n"
         f"Recent chat:\n{recent or 'none'}\n\n"
-        f"Sabbir says: {message}"
+        f"{user_name} says: {message}"
     )
     body = json.dumps(
         {
@@ -1416,13 +1602,23 @@ class AssistantHandler(BaseHTTPRequestHandler):
             message = str(payload.get("message", "")).strip()
             chat = payload.get("chat", [])
             memory = load_memory(user_id)
-            profile_changed = update_profile_from_message(message, memory)
+            profile_changed = apply_profile(memory, payload.get("profile"))
+            profile_changed = update_profile_from_message(message, memory) or profile_changed
             if profile_changed:
                 save_memory(user_id, memory)
             reply = ask_openai(message, chat, memory)
             if not reply:
                 reply = profile_ack(memory) if profile_changed else offline_reply(message, memory, user_id)
             self.send_json({"reply": reply, "memory": public_memory(load_memory(user_id))})
+            return
+
+        if self.path == "/api/profile":
+            payload = self.read_json()
+            user_id = clean_user_id(payload.get("user_id"))
+            memory = load_memory(user_id)
+            apply_profile(memory, payload.get("profile"))
+            save_memory(user_id, memory)
+            self.send_json(public_memory(memory))
             return
 
         if self.path == "/api/memory":
@@ -1497,7 +1693,7 @@ def main():
         actual_port = server.server_address[1]
         shown_host = "127.0.0.1" if host == "0.0.0.0" else host
         url = f"http://{shown_host}:{actual_port}"
-        print(f"Sabbir Personal AI is running at {url}")
+        print(f"Personal AI Chat is running at {url}")
         print("Set GEMINI_API_KEY before running for full AI answers.")
         print("Press Ctrl+C to stop.")
         if should_open_browser(host):
